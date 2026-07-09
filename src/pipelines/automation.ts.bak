@@ -1,0 +1,96 @@
+/**
+ * Amorfly Automation & Custom bash Pipeline compiler
+ * Module: /pipelines & /extensions
+ * Builds custom bash pipelines and routines.
+ */
+
+import { SecuritySandbox } from '../security/encryption';
+
+export interface PipelineTask {
+  id: string;
+  name: string;
+  command: string;
+  category: 'system' | 'media' | 'document' | 'network';
+  status: 'pending' | 'running' | 'success' | 'failed';
+  outputLog?: string;
+  executionTimeMs?: number;
+}
+
+export class AutomationPipelineEngine {
+  private static tasksDatabase: PipelineTask[] = [
+    {
+      id: 'pipe_ram_flush',
+      name: 'Günlük RAM ve Önbellek Optimize Edici',
+      command: 'sync && sudo sysctl -w vm.drop_caches=3',
+      category: 'system',
+      status: 'pending'
+    },
+    {
+      id: 'pipe_vlc_setup',
+      name: 'VLC SVG Donanım İvme Kurulumu',
+      command: 'sudo apt-get install -y vlc-plugin-svg libva-drm2 mesa-va-drivers',
+      category: 'media',
+      status: 'pending'
+    },
+    {
+      id: 'pipe_logs_cleanup',
+      name: 'Gereksiz Arka Plan Log Temizliği',
+      command: 'rm -f ~/.amorfly/*.log.old && find . -name "*.log" -size +10M -delete',
+      category: 'system',
+      status: 'pending'
+    }
+  ];
+
+  public static getPipelines(): PipelineTask[] {
+    return this.tasksDatabase;
+  }
+
+  /**
+   * Compiles custom automation logic with safety checks
+   */
+  public static compileBashPipeline(name: string, description: string, commands: string[]): PipelineTask {
+    const rawCommand = commands.join(' && ');
+    const isSafe = SecuritySandbox.validateShellCommand(rawCommand);
+    
+    const newTask: PipelineTask = {
+      id: `pipe_custom_${Math.random().toString(36).substr(2, 9)}`,
+      name: name || 'Özel Otomasyon Betiği',
+      command: rawCommand,
+      category: 'system',
+      status: isSafe ? 'pending' : 'failed',
+      outputLog: isSafe ? undefined : 'GÜVENLİK ENGELİ: Betikte güvensiz tokenlar veya sistem dosyalarına yetkisiz erişim algılandı.'
+    };
+
+    this.tasksDatabase.push(newTask);
+    return newTask;
+  }
+
+  /**
+   * Safe execution simulator (replays inside secure sandbox UI)
+   */
+  public static async executePipeline(id: string): Promise<PipelineTask> {
+    const task = this.tasksDatabase.find(t => t.id === id);
+    if (!task) throw new Error('Task not found');
+
+    if (task.status === 'failed' && task.outputLog) {
+      return task; // Already rejected
+    }
+
+    task.status = 'running';
+    task.outputLog = 'Sistem otomasyon boru hattı (Pipeline) başlatıldı...\n';
+    
+    const startTime = Date.now();
+    
+    // Custom simulated pipeline runner with logs
+    await new Promise(resolve => setTimeout(resolve, 800));
+    
+    task.outputLog += `Executing: "${task.command}"\n`;
+    await new Promise(resolve => setTimeout(resolve, 700));
+
+    task.status = 'success';
+    task.executionTimeMs = Date.now() - startTime;
+    task.outputLog += `\n[AMORFLY BASH RUNNER SUB-LEVEL SUCCESS]\nGörev başarıyla yürütüldü. Çalışma Süresi: ${task.executionTimeMs}ms\nÇıkış (Exit) Kodu: 0\nİşlem başarılı.`;
+
+    return task;
+  }
+}

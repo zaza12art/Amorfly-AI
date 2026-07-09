@@ -1,0 +1,58 @@
+[package]
+name = "amorfly-ai"
+version = "0.1.0"
+description = "Amorfly AI - Gizlilik odaklı, yerel-öncelikli Linux masaüstü AI asistanı"
+authors = ["Amorfly"]
+edition = "2021"
+
+[lib]
+name = "amorfly_ai_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["tray-icon", "protocol-asset"] }
+tauri-plugin-shell = "2"
+tauri-plugin-opener = "2"
+tauri-plugin-notification = "2"
+tauri-plugin-dialog = "2"
+tauri-plugin-fs = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Ollama (yerel) ve kullanıcının kendi seçtiği online sağlayıcı için HTTP.
+# Google/Gemini'ye özel hiçbir bağımlılık yok.
+reqwest = { version = "0.12", features = ["json", "stream"] }
+tokio = { version = "1", features = ["full"] }
+futures-util = "0.3"
+
+# Faz 2: Gerçek şifreleme (Base64 hilesi değil)
+aes-gcm = "0.10"
+rand = "0.8"
+dirs = "5"
+base64 = "0.22"
+
+# Altyazı/dublaj: zaman damgalı segmentleri işlemek için
+regex = "1"
+uuid = { version = "1", features = ["v4"] }
+
+# Belge okuma/yazma: Excel
+calamine = "0.26"
+rust_xlsxwriter = "0.79"
+
+# RAG (aranabilir belge hafızası): yerel SQLite, sunucu/servis gerekmez
+rusqlite = { version = "0.31", features = ["bundled"] }
+
+# Sürüm bilgisi ve tanılama için
+chrono = "0.4"
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = "s"
+strip = true
+# NOT: panic = "abort" BİLİNÇLİ OLARAK KULLANILMIYOR. Abort modunda tek bir
+# modüldeki panik tüm uygulamayı anında kapatır. Varsayılan "unwind" ile bir
+# komuttaki panik yalnızca o çağrıyı başarısız kılar, uygulama ayakta kalır.

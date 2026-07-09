@@ -1,0 +1,106 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Fira Code", "JetBrains Mono", ui-monospace, monospace;
+}
+
+@keyframes scanline {
+  0% {
+    transform: translateY(-100%);
+  }
+  100% {
+    transform: translateY(100%);
+  }
+}
+
+@keyframes pulse-cyan {
+  0%, 100% {
+    opacity: 0.4;
+    box-shadow: 0 0 10px rgba(6, 182, 212, 0.2);
+  }
+  50% {
+    opacity: 0.9;
+    box-shadow: 0 0 25px rgba(6, 182, 212, 0.6);
+  }
+}
+
+@keyframes hologram-flicker {
+  0% { opacity: 0.97; }
+  5% { opacity: 0.85; }
+  6% { opacity: 0.95; }
+  100% { opacity: 0.98; }
+}
+
+.cyber-scanline {
+  position: relative;
+  overflow: hidden;
+}
+
+.cyber-scanline::after {
+  content: " ";
+  display: block;
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  right: 0;
+  background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+  z-index: 2;
+  background-size: 100% 4px, 6px 100%;
+  pointer-events: none;
+}
+
+.neon-border-cyan {
+  border: 1px solid rgba(6, 182, 212, 0.25);
+  box-shadow: 0 0 12px rgba(6, 182, 212, 0.1);
+  transition: all 0.3s ease;
+}
+
+.neon-border-cyan:hover {
+  border: 1px solid rgba(6, 182, 212, 0.6);
+  box-shadow: 0 0 20px rgba(6, 182, 212, 0.3);
+}
+
+.neon-border-purple {
+  border: 1px solid rgba(168, 85, 247, 0.25);
+  box-shadow: 0 0 12px rgba(168, 85, 247, 0.1);
+  transition: all 0.3s ease;
+}
+
+.neon-border-purple:hover {
+  border: 1px solid rgba(168, 85, 247, 0.6);
+  box-shadow: 0 0 20px rgba(168, 85, 247, 0.3);
+}
+
+.neon-text-cyan {
+  text-shadow: 0 0 8px rgba(6, 182, 212, 0.6);
+}
+
+.neon-text-purple {
+  text-shadow: 0 0 8px rgba(168, 85, 247, 0.6);
+}
+
+.neon-text-orange {
+  text-shadow: 0 0 8px rgba(249, 115, 22, 0.6);
+}
+
+.hologram-glow {
+  animation: hologram-flicker 4s infinite;
+}
+
+/* Custom cyber scrollbar */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: rgba(15, 23, 42, 0.3);
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(6, 182, 212, 0.2);
+  border-radius: 999px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(6, 182, 212, 0.5);
+}

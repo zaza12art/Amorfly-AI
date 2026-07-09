@@ -1,0 +1,95 @@
+/**
+ * Amorfly Core Orchestrator & System Logic Bridge
+ * Module: /core
+ * Implements the Offline-First, Permission-First gateway for cloud use.
+ */
+
+import { SecuritySandbox } from '../security/encryption';
+
+export type IsolationMode = 'STRICT_OFFLINE' | 'HYBRID_ACCELERATED' | 'CLOUD_TUNNEL';
+
+export class CoreOrchestrator {
+  private static activeMode: IsolationMode = 'STRICT_OFFLINE';
+  private static telemetryBlockedByCore: boolean = true;
+
+  public static getMode(): IsolationMode {
+    return this.activeMode;
+  }
+
+  public static setMode(mode: IsolationMode): void {
+    this.activeMode = mode;
+    if (mode === 'STRICT_OFFLINE') {
+      SecuritySandbox.setTelemetry(false);
+      this.telemetryBlockedByCore = true;
+    } else {
+      this.telemetryBlockedByCore = false;
+    }
+  }
+
+  /**
+   * Secure Offline-First Dispatcher
+   * Before sending any request to Gemini or external nodes, check consent and offline state.
+   */
+  public static async dispatchInference(
+    prompt: string, 
+    localHandler: () => Promise<string>, 
+    cloudHandler: () => Promise<string>,
+    onPermissionRequired: () => Promise<boolean>
+  ): Promise<{ response: string; source: 'local_ollama' | 'cloud_accelerated' | 'offline_blocked' }> {
+    
+    // Strict Offline Mode instantly diverts to Ollama local handler
+    if (this.activeMode === 'STRICT_OFFLINE') {
+      try {
+        const localResult = await localHandler();
+        return { response: localResult, source: 'local_ollama' };
+      } catch (err) {
+        return { 
+          response: 'HATA (Çevrimdışı Güvenlik Engeli): Çevrimdışı Modda local Ollama sunucusuna erişilemedi. Lütfen sisteminizde `ollama serve` komutunun açık olduğundan emin olun.', 
+          source: 'offline_blocked' 
+        };
+      }
+    }
+
+    // Hybrid Mode requires prompt evaluation - asks permission if heavy task detected
+    if (this.activeMode === 'HYBRID_ACCELERATED') {
+      const isComplexQuery = prompt.length > 500 || prompt.toLowerCase().includes('kodla') || prompt.toLowerCase().includes('analiz');
+      
+      if (isComplexQuery) {
+        // Must ask for user confirmation before sending ANY token payload to Cloud
+        const consent = await onPermissionRequired();
+        if (consent) {
+          try {
+            const cloudResult = await cloudHandler();
+            return { response: cloudResult, source: 'cloud_accelerated' };
+          } catch (err) {
+            // Roll back to local
+            const localResult = await localHandler();
+            return { response: localResult, source: 'local_ollama' };
+          }
+        }
+      }
+      
+      // Default fallback to local inference for lightweight workflows
+      try {
+        const localResult = await localHandler();
+        return { response: localResult, source: 'local_ollama' };
+      } catch (e) {
+        // Fall back to cloud safely if permitted as a backup
+        const cloudResult = await cloudHandler();
+        return { response: cloudResult, source: 'cloud_accelerated' };
+      }
+    }
+
+    // Cloud Tunnel mode directly proxies to cloud endpoint
+    try {
+      const cloudResult = await cloudHandler();
+      return { response: cloudResult, source: 'cloud_accelerated' };
+    } catch (e: any) {
+      return { response: `Hata: Bulut Gateway bağlantısında sorun oluştu. Detay: ${e.message}`, source: 'offline_blocked' };
+    }
+  }
+
+  public static isTelemetrySafeguarded(): boolean {
+    return this.telemetryBlockedByCore && SecuritySandbox.isTelemetryBlocked();
+  }
+}

@@ -1,0 +1,98 @@
+/**
+ * Amorfly GPU & Hardware Resource Optimizer
+ * Module: /system
+ * Analyzes local VRAM, adjusts LLM quantization levels, and handles CPU fallback.
+ */
+
+export interface GPUStats {
+  vendor: string;
+  model: string;
+  totalVRAM: number; // in MB
+  freeVRAM: number; // in MB
+  computeCores: number;
+  temperature: number; // in C
+  quantizationRecommendation: 'FP16' | 'Q8_0' | 'Q4_K_M' | 'Q2_K' | 'CPU_ONLY';
+}
+
+export class GPUManager {
+  /**
+   * Safe check for WebGL/Nvidia drivers to determine VRAM budget
+   */
+  public static async queryGPUStats(): Promise<GPUStats> {
+    let vendor = 'GNU/Linux Default Graphic System';
+    let model = 'CPU Fallback Core';
+    let totalVRAM = 4096; // Fallback 4GB
+    let freeVRAM = 2800;
+    let computeCores = 0;
+    let temperature = 42;
+
+    try {
+      // In web browser context, we can try to query canvas webgl unmasked renderer
+      if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+        const canvas = document.createElement('canvas');
+        const gl = (canvas.getContext('webgl') || canvas.getContext('experimental-webgl')) as any;
+        if (gl) {
+          const dbgRenderInfo = gl.getExtension('WEBGL_debug_renderer_info');
+          if (dbgRenderInfo) {
+            vendor = gl.getParameter(dbgRenderInfo.UNMASKED_VENDOR_WEBGL) || vendor;
+            model = gl.getParameter(dbgRenderInfo.UNMASKED_RENDERER_WEBGL) || model;
+            
+            // Extract typical VRAM limits based on specific cards detected
+            const modelLower = model.toLowerCase();
+            if (modelLower.includes('rtx 4090') || modelLower.includes('rtx 3090') || modelLower.includes('a100') || modelLower.includes('h100')) {
+              totalVRAM = 24576;
+              computeCores = 16384;
+            } else if (modelLower.includes('rtx 4080') || modelLower.includes('rtx 3080') || modelLower.includes('rtx 4070')) {
+              totalVRAM = 16384;
+              computeCores = 10240;
+            } else if (modelLower.includes('rtx 4060') || modelLower.includes('rtx 3060') || modelLower.includes('rtx 2060')) {
+              totalVRAM = 12288;
+              computeCores = 4880;
+            } else if (modelLower.includes('gtx') || modelLower.includes('rx ')) {
+              totalVRAM = 8192;
+              computeCores = 2048;
+            } else {
+              totalVRAM = 4096;
+              computeCores = 512;
+            }
+            freeVRAM = Math.round(totalVRAM * 0.72); // Assume 72% free initially
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Browser WebGL GPU context query disabled or blocked by container layout', e);
+    }
+
+    // Determine secure local model quantization strategies inside Amorfly operating limits
+    let quantizationRecommendation: 'FP16' | 'Q8_0' | 'Q4_K_M' | 'Q2_K' | 'CPU_ONLY' = 'CPU_ONLY';
+
+    if (totalVRAM >= 12000) {
+      quantizationRecommendation = 'FP16'; // Lossless runs
+    } else if (totalVRAM >= 8192) {
+      quantizationRecommendation = 'Q8_0'; // Light quantized 8-bit
+    } else if (totalVRAM >= 4096) {
+      quantizationRecommendation = 'Q4_K_M'; // Medium quantized 4-bit (Highly recommended for speed)
+    } else if (totalVRAM >= 2048) {
+      quantizationRecommendation = 'Q2_K'; // Ultra quantized 2-bit
+    } else {
+      quantizationRecommendation = 'CPU_ONLY'; // Pure CPU inference fallback
+    }
+
+    return {
+      vendor,
+      model,
+      totalVRAM,
+      freeVRAM,
+      computeCores,
+      temperature,
+      quantizationRecommendation
+    };
+  }
+
+  /**
+   * Helper to compute recommended local token calculation size
+   */
+  public static calculateThreadCount(cpuCores: number): number {
+    return Math.max(1, Math.min(cpuCores - 2, 8)); // Always preserve 2 hardware threads for OS balance
+  }
+}

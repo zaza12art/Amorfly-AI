@@ -1,0 +1,113 @@
+/**
+ * Amorfly Offline Model Market System Registry
+ * Module: /models & /store
+ * Direct local/Ollama models downloading, RAM checking, and benchmarks scoring.
+ */
+
+export interface AIModelSpec {
+  id: string;
+  name: string;
+  sizeGB: number;
+  parameters: string;
+  requiredRAM: number; // in GB
+  requiredVRAM: number; // in GB
+  benchmarks: {
+    tokensPerSecondCPU: number;
+    tokensPerSecondGPU: number;
+    accuracyScorePercent: number;
+  };
+  recommendedFor: string;
+  status: 'available' | 'downloading' | 'not_downloaded' | 'update_required';
+  downloadProgress?: number; // 0 - 100
+}
+
+export class ModelMarketRegistry {
+  private static mockDatabase: AIModelSpec[] = [
+    {
+      id: 'llama-3-8b-gguf',
+      name: 'Llama 3 (8B) GGUF - Meta AI / TheBloke',
+      sizeGB: 4.5,
+      parameters: '8.0 Billion',
+      requiredRAM: 12,
+      requiredVRAM: 6,
+      benchmarks: { tokensPerSecondCPU: 8, tokensPerSecondGPU: 36, accuracyScorePercent: 82.5 },
+      recommendedFor: 'Tüm Yükler, Güçlü Çevrimdışı Mantık & Masaüstü RAG (Q4_K_M)',
+      status: 'not_downloaded',
+      downloadProgress: 0
+    },
+    {
+      id: 'whisper-tiny-cpp',
+      name: 'Whisper.cpp (Tiny) - Gerganov',
+      sizeGB: 0.08,
+      parameters: '39 Million',
+      requiredRAM: 1,
+      requiredVRAM: 0.5,
+      benchmarks: { tokensPerSecondCPU: 140, tokensPerSecondGPU: 390, accuracyScorePercent: 89.4 },
+      recommendedFor: 'Hızlı Canlı Altyazı, VLC Gerçek Zamanlı Deşifre, CPU Dostu',
+      status: 'not_downloaded',
+      downloadProgress: 0
+    },
+    {
+      id: 'piper-tts',
+      name: 'Piper TTS (Turkish) - Nabu Casa / Mycroft',
+      sizeGB: 0.05,
+      parameters: 'Hafif Nöral Ağ',
+      requiredRAM: 0.5,
+      requiredVRAM: 0,
+      benchmarks: { tokensPerSecondCPU: 240, tokensPerSecondGPU: 600, accuracyScorePercent: 0 },
+      recommendedFor: 'Yerel ve Çevrimdışı Anında Türkçe Seslendirme',
+      status: 'not_downloaded',
+      downloadProgress: 0
+    },
+    {
+      id: 'argos-translate-tr-en',
+      name: 'Argos Translate (TR/EN) - NLLB Offline',
+      sizeGB: 0.2,
+      parameters: 'Paket Çeviri Motoru',
+      requiredRAM: 2,
+      requiredVRAM: 0,
+      benchmarks: { tokensPerSecondCPU: 50, tokensPerSecondGPU: 110, accuracyScorePercent: 0 },
+      recommendedFor: 'VLC Altyazıları için Anında Offline Metin Çevirisi',
+      status: 'not_downloaded',
+      downloadProgress: 0
+    },
+    {
+      id: 'gemma-2b',
+      name: 'Gemma 2 (2B) - Google',
+      sizeGB: 1.6,
+      parameters: '2.5 Billion',
+      requiredRAM: 4,
+      requiredVRAM: 2,
+      benchmarks: { tokensPerSecondCPU: 18, tokensPerSecondGPU: 55, accuracyScorePercent: 74.2 },
+      recommendedFor: 'Hafif Sistemler, Hızlı Sohbet & Cihaz-İçi Çeviri',
+      status: 'available',
+      downloadProgress: 100
+    }
+  ];
+
+  public static getModelsList(): AIModelSpec[] {
+    return this.mockDatabase;
+  }
+
+  public static async queryOllamaInstalledModels(): Promise<string[]> {
+    try {
+      // In a real local installation, we ping Ollama `http://127.0.0.1:11434/api/tags`
+      const res = await fetch('http://127.0.0.1:11434/api/tags');
+      const data = await res.json();
+      if (data.models) {
+        return data.models.map((m: any) => m.name);
+      }
+    } catch (e) {
+      // Quiet fail if Ollama daemon is offline/not started yet
+    }
+    return ['gemma:2b']; // Fallback initially
+  }
+
+  public static updateModelStatus(id: string, status: 'available' | 'downloading' | 'not_downloaded', progress?: number): void {
+    const item = this.mockDatabase.find(m => m.id === id);
+    if (item) {
+      item.status = status;
+      if (progress !== undefined) item.downloadProgress = progress;
+    }
+  }
+}

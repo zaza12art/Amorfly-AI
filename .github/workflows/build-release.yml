@@ -1,0 +1,87 @@
+name: Amorfly AI - Masaüstü Uygulaması Derle
+
+# Bu workflow, GitHub'ın KENDİ sunucusunda (senin bilgisayarında değil)
+# gerçek bir Ubuntu makinesinde Rust + npm kurup uygulamayı derler ve:
+#   1) .AppImage / .deb dosyalarını "Artifacts" bölümüne (geçici, 90 gün)
+#   2) Sabit, HER ZAMAN AYNI linke sahip bir GitHub "Release" olarak da
+#      (kalıcı, süresiz) yükler — böylece terminalden tek komutla en
+#      güncel sürümü indirebilirsin, zip indirip Codespace'e uğraşmana
+#      gerek kalmaz. Bkz. kur.sh dosyası.
+#
+# Nasıl çalıştırılır:
+#   1. Bu projeyi bir GitHub deposuna push et (ücretsiz hesap yeterli).
+#   2. GitHub'da "Actions" sekmesine gir.
+#   3. Sol menüden "Amorfly AI - Masaüstü Uygulaması Derle" seç.
+#   4. "Run workflow" butonuna tıkla.
+#   5. ~5-10 dakika sonra:
+#      - Terminalden: curl -fsSL https://raw.githubusercontent.com/KULLANICI_ADIN/REPO_ADIN/main/kur.sh | bash
+#      - Ya da "Artifacts" bölümünden amorfly-ai-linux.zip'i elle indir.
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches: [ "main" ]
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Node.js kur
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+
+      - name: Rust kur
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cargo önbelleği
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Tauri Linux sistem bağımlılıkları
+        run: |
+          sudo apt update
+          sudo apt install -y libwebkit2gtk-4.1-dev build-essential curl wget file \
+            libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
+
+      - name: npm bağımlılıklarını kur
+        run: npm install
+
+      - name: Uygulamayı derle (.AppImage + .deb üretir)
+        run: npm run tauri:build
+
+      - name: Derleme çıktılarını indirilebilir yap (Artifacts - geçici)
+        uses: actions/upload-artifact@v4
+        with:
+          name: amorfly-ai-linux
+          path: |
+            src-tauri/target/release/bundle/appimage/*.AppImage
+            src-tauri/target/release/bundle/deb/*.deb
+          if-no-files-found: error
+
+      - name: Sabit isimli kopya oluştur (Release linkinin hiç değişmemesi için)
+        run: |
+          mkdir -p release-dist
+          cp src-tauri/target/release/bundle/appimage/*.AppImage "release-dist/Amorfly-AI.AppImage"
+          cp src-tauri/target/release/bundle/deb/*.deb "release-dist/Amorfly-AI.deb"
+          chmod +x "release-dist/Amorfly-AI.AppImage"
+
+      - name: GitHub Release olarak yayınla (kalıcı, sabit link)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: "Amorfly AI - En Güncel Sürüm"
+          body: "Otomatik derleme. En güncel .AppImage ve .deb dosyaları aşağıda. Terminalden kurmak için: curl -fsSL https://raw.githubusercontent.com/${{ github.repository }}/main/kur.sh | bash"
+          files: |
+            release-dist/Amorfly-AI.AppImage
+            release-dist/Amorfly-AI.deb
+          prerelease: false
+          make_latest: true
